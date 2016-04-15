@@ -1,15 +1,14 @@
-#!/usr/bin/env python
 #-----------------------------------------------------------------------------
 # File:        TBUtil.py
 # Description: TB 2016 simple HGC test beam event display utilities
 # Created:     10-Apr-2016 Jeremy Thomas, Harrison B. Prosper
 #-----------------------------------------------------------------------------
 import sys, os, re
-from ROOT import *
 from string import atof, lower, replace, strip, split, joinfields, find
 from array import array
 from math import *
-from HGCal.TBEventDisplay.Util    import root
+from ROOT import *
+#from HGCal.TBEventDisplay.Util import *
 #------------------------------------------------------------------------------
 def getValue(record):
     return atof(split(record)[0])
@@ -84,38 +83,38 @@ def computeHexVertices(side):
     x.append( S/2); y.append(-H)
     return (x, y)
 #------------------------------------------------------------------------------
-    def getHits(parent, cellmap, keyname="TBRecHit"):
-        try:
-            rechits = parent.reader(keyname)
-        except:
-            return (None, None)
+def getHits(parent, cellmap, geometry, keyname="TBRecHit"):
+    try:
+        rechits = parent.reader(keyname)
+    except:
+        return (None, None)
 
-        maxenergy =-1.0
-        hits = []
-        wafer= {}
-        for ii in xrange(rechits.size()):
-            energy = rechits[ii].energy()
-            cellid = rechits[ii].id()
-            l = cellid.layer()
-            u = cellid.iu()
-            v = cellid.iv()
-            pos = cellmap(u, v)
-            x = pos.first
-            y = pos.second
-            #record ="cell(%3d,%3d,%3d): %8.3f GeV" % (l, u ,v, energy)
-            #print record
+    maxenergy =-1.0
+    hits = []
+    wafer= {}
+    for ii in xrange(rechits.size()):
+        energy = rechits[ii].energy()
+        cellid = rechits[ii].id()
+        l = cellid.layer()
+        u = cellid.iu()
+        v = cellid.iv()
+        pos = cellmap(u, v)
+        x = pos.first
+        y = pos.second
+        #record ="cell(%3d,%3d,%3d): %8.3f GeV" % (l, u ,v, energy)
+        #print record
 
-            if not wafer.has_key(l):
-                parent.debug("begin new wafer")
-                # silicon wafer is last sub-layer of layer (aka module)
-                module  = self.design[l]
-                element = module[-1]
-                z    = getValue(element['z'])
-                cellside = getValue(element['cellside'])
-                wafer[l] = (z, cellside)
+        if not wafer.has_key(l):
+            parent.debug("begin new wafer")
+            # silicon wafer is last sub-layer of layer (aka module)
+            module  = geometry[l]
+            element = module[-1]
+            z    = getValue(element['z'])
+            cellside = getValue(element['cellside'])
+            wafer[l] = (z, cellside)
 
-            z, cellside = wafer[l]
-            hits.append((energy, l, u, v, x, y, z, cellside))
-            if energy > maxenergy: maxenergy = energy
+        z, cellside = wafer[l]
+        hits.append((energy, l, u, v, x, y, z, cellside))
+        if energy > maxenergy: maxenergy = energy
 
-        return (maxenergy, hits)
+    return (maxenergy, hits)

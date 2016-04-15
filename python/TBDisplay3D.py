@@ -9,7 +9,6 @@ from ROOT import *
 from string import atof, lower, replace, strip, split, joinfields, find
 from array import array
 from math import *
-from HGCal.TBEventDisplay.Util import Connection, root
 from HGCal.TBEventDisplay.TBUtil import *
 #------------------------------------------------------------------------------
 COLOR = {'W':   kRed,
@@ -26,11 +25,13 @@ TRANSPARENCY = {'W':   99,
 #------------------------------------------------------------------------------
 class Display3D:
 
-    def __init__(self, page, geometry='TB2016Design'):
+    def __init__(self, parent, page):
 
-        self.cellmap = HGCCellMap()
-        self.page = page
-        self.first = True
+        self.cellmap = parent.cellmap
+        self.geometry= parent.geometry
+        self.nlayers = len(self.geometry)
+        self.page    = page
+        self.first   = True
 
         # some shapes might be pickable
         self.pickables = Pickable()
@@ -42,13 +43,8 @@ class Display3D:
                                            "Cleared()",
                                            self, "cleared"))
 
-        # get test beam geometry
-        exec('from HGCal.TBStandaloneSimulator.%s import Geometry' % geometry)
-        self.design = Geometry
-        self.nlayers= len(self.design)
-
         # construct (x,y) vertices of a hexagon centered at the origin
-        module  = self.design[0]
+        module  = self.geometry[0]
         element = module[0]
         material= element['material']
         side = getValue(element['side'])
@@ -78,7 +74,6 @@ class Display3D:
     # Draw wafer and hits
     #----------------------------------------------------------------------
     def Draw(self, parent):	
-        print "Event: %d" % parent.eventNumber
 
         # either add more objects to existing
         # picture or refresh
@@ -106,7 +101,7 @@ class Display3D:
         self.Show()
 
     def drawModule(self, parent, ii):
-        module = self.design[ii]
+        module = self.geometry[ii]
 
         for jj, element in enumerate(module):
             material = element['material']
@@ -136,7 +131,7 @@ class Display3D:
             self.page.fixedelements.AddElement(shape)
 
     def drawHits(self, parent):
-        maxenergy, hits = getHits(parent)
+        maxenergy, hits = getHits(parent, self.cellmap, self.geometry)
         if maxenergy == None: return
 
         for ii,(energy, layer, u, v, x, y, z, size) in enumerate(hits):

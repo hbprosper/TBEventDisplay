@@ -15,6 +15,7 @@ status = gSystem.Load('libFWCoreFWLite')
 if status != 0:
      sys.exit('**unable to load libFWCoreFWLite')
 else:
+     print 'enabling auto loader'
      FWLiteEnabler.enable()
 
 # GUI widget Layouts

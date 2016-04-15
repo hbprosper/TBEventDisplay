@@ -5,15 +5,14 @@
 # Created:     25-Mar-2016 Jeremy Thomas & Harrison B. Prosper
 #              (adapted from TB 2014 display by Sam Bein & HBP)
 #-----------------------------------------------------------------------------
-import sys, os, re, time
+import sys, os, re, time, platform
 from time import ctime, sleep
-from string import *
-from glob import glob
 from array import array
 from HGCal.TBEventDisplay.Util import *
 from HGCal.TBEventDisplay.TBHeatMap import HeatMap
 from HGCal.TBEventDisplay.TBDisplay3D import Display3D
 from HGCal.TBStandaloneSimulator.TBFileReader import TBFileReader
+from string import *
 from ROOT import *
 #------------------------------------------------------------------------------
 WIDTH        = 1000            # Width of GUI in pixels
@@ -45,12 +44,12 @@ R_REWIND  =-1
 R_ONESHOT = 0
 R_FORWARD = 1
 
-MINDELAY  = 1
+MINDELAY  = 0.1
 
 DEBUG = 0
 
-PAGES = [(0, 'Heatmap',   'HeatMap(page)', None),
-         (1, 'Display3D', 'Display3D(page)', None)]
+PAGES = [(0, 'Heatmap',   'HeatMap(self, page)',   None),
+         (1, 'Display3D', 'Display3D(self, page)', None)]
 
 #-----------------------------------------------------------------------------
 # (A) Root Graphical User Interfaces (GUI)
@@ -112,7 +111,8 @@ class TBEventDisplay:
     gui = TBEventDisplay(title)
     """
 
-    def __init__(self, title, filename=None, width=WIDTH, height=HEIGHT):
+    def __init__(self, title, geometry='TB2016Design',
+                 filename=None, width=WIDTH, height=HEIGHT):
 
         # Initial directory for open file dialog
         self.openDir  = os.environ['PWD']
@@ -124,7 +124,12 @@ class TBEventDisplay:
 
         self.Color = root.Color
         self.accumulate = False
-        self.energyCut  = 0.0001 # GeV
+        self.energyCut  = 0.1 # GeV
+        self.cellmap    = HGCCellMap()
+        # get test beam geometry
+        exec('from HGCal.TBStandaloneSimulator.%s import Geometry' % geometry)
+        self.geometry   = Geometry
+        self.shutterOpen= False
 
         #-------------------------------------------------------------------
         # Create main frame
@@ -185,12 +190,12 @@ class TBEventDisplay:
         self.vframe.AddFrame(self.toolBar, TOP_X)
 
         self.nextButton = PictureButton(self, self.toolBar,
-                                        picture='StepForward.png',
+                                        picture='GoForward.gif',
                                         method='nextEvent',
                                         text='go to next event')
 
         self.forwardButton = PictureButton(self, self.toolBar,
-                                           picture='GoForward.gif',
+                                           picture='StepForward.png',
                                            method='forwardPlayer',
                                            text='foward event player')
         
@@ -209,18 +214,15 @@ class TBEventDisplay:
                                             method='previousEvent',
                                             text='go to previous event') 
 
-        self.snapCanvasButton = PictureButton(self, self.toolBar,
-                                              picture='Camera.png',
-                                              method='snapCanvas',
-                                              text='make a pdf of this canvas')
-
-
         self.accumulateButton = CheckButton(self, self.toolBar,
                                             hotstring='Accumulate',
                                             method='toggleAccumulate',
                                             text='Accumulate')
   
-
+        self.snapCanvasButton = PictureButton(self, self.toolBar,
+                                              picture='Camera.png',
+                                              method='snapCanvas',
+                                              text='make a pdf of this canvas')
         #-------------------------------------------------------------------
         # Add a notebook with multiple pages
         #-------------------------------------------------------------------  
@@ -259,6 +261,7 @@ class TBEventDisplay:
         # Initial state
         self.nevents = 0
         self.eventNumber = -1
+        self.Delay  = MINDELAY
         self.DELAY  = int(1000*MINDELAY)
         self.mutex  = TMutex(kFALSE)
         self.timer  = TTimer()
@@ -276,11 +279,8 @@ class TBEventDisplay:
         if filename != None: 
             self.__openFile(filename)
 
-
-        # To DEBUG a display uncomment next two lines
-        self.noteBook.SetPage('HeatMap')
-        self.displayEvent()
-        self.setEnergyCut()
+        # To DEBUG a display uncomment next line
+        #self.setPage(0)
 
     def __del__(self):
         pass
@@ -420,13 +420,6 @@ class TBEventDisplay:
     def toggleAccumulate(self):
         self.accumulate = not self.accumulate
 
-    def setDelay(self):
-        from string import atof
-        dialog = Dialog(self.root, self.main)
-        seconds= atof(dialog.GetInput('Enter delay in seconds', '2.0'))
-        self.playerDelay = max(MINDELAY, int(1000*seconds))
-        self.statusBar.SetText('delay set to: %8.1f s' % seconds, 1)
-
     def usage(self):
         dialog = Dialog(self.root, self.main)
         dialog.SetText('Not done', 'Sorry!', 230, 30)
@@ -509,24 +502,30 @@ class TBEventDisplay:
 
     def setEnergyCut(self):
         from string import atof
-        dialog = Dialog(gClient.GetRoot(), self.main)
-        self.energyCut = atof(dialog.GetInput('enter cell energy cut', '0.01'))
+        dialog = Dialog(self.root, self.main)
+        self.energyCut = atof(dialog.GetInput('enter cell energy cut', 
+                                              '%10.3f' % self.energyCut))
         self.statusBar.SetText('energy cut set to: %8.2f GeV' % \
                                    self.energyCut, 1)	
 
     def setDelay(self):
         from string import atof
-        dialog = Dialog(gClient.GetRoot(), self.main)
-        seconds= atof(dialog.GetInput('Enter delay in seconds', '2.0'))
-        self.playerDelay = max(MINDELAY, int(1000*seconds))
-        self.statusBar.SetText('delay set to: %8.1f s' % seconds, 1)	
+        dialog = Dialog(self.root, self.main)
+        seconds= atof(dialog.GetInput('Enter delay in seconds', 
+                                      '%10.3f' % self.Delay))
+        self.Delay = seconds
+        self.DELAY = max(MINDELAY, int(1000*seconds))
+        self.statusBar.SetText('delay set to: %8.2f s' % seconds, 1)
+
 #------------------------------------------------------------------------------
 def main():
     if len(sys.argv) > 1:
         filename = sys.argv[1]
     else:
         filename = None
-    display = TBEventDisplay('CMS HGCAL Test Beam Event Display', filename)
+    display = TBEventDisplay('CMS HGCAL Test Beam Event Display',
+                             'TB2016Design', 
+                             filename)
     display.run()
 #------------------------------------------------------------------------------
 try:
