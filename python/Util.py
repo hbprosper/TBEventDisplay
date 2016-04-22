@@ -111,25 +111,45 @@ class MenuBar(TGMenuBar):
 #-----------------------------------------------------------------------------
 class ProgressBar(TGHProgressBar):
 	
-	def __init__(self, obj, toolBar, seconds=0.2):
-		TGHProgressBar.__init__(self, toolBar,
-					TGProgressBar.kFancy, 100)
+     def __init__(self, obj, toolBar, seconds=0.2):
+          TGHProgressBar.__init__(self, toolBar,
+                                  TGProgressBar.kFancy, 100)
 		
-		toolBar.AddFrame(self,
-				 TGLayoutHints(100, 600, 12, 80))
+          toolBar.AddFrame(self,
+                           TGLayoutHints(100, 600, 12, 80))
 
-		self.SetBarColor("green")
-		self.SetRange(0, K_PROG_MAX)
+          self.SetBarColor("green")
+          self.SetRange(0, K_PROG_MAX)
 
-		# Set up a timer for progress bars
-		#self.timer = TTimer()
-		#self.connection = Connection(self.timer, "Timeout()", object, method)
+          # Set up a timer for progress bars
+          #self.timer = TTimer()
+          #self.connection = Connection(self.timer, "Timeout()", object, method)
 
-	def __del__(self):
-		pass
-	
+     def __del__(self):
+          pass
 #-----------------------------------------------------------------------------
 buttonNumber=-1
+class TextButton(TGTextButton):
+     def __init__(self, obj, toolBar,
+                  label,
+                  method,
+                  text='',
+                  layout=kLHintsRight):
+          global buttonNumber
+          buttonNumber += 1
+          number = buttonNumber
+		
+          TGTextButton.__init__(self, toolBar, 
+                                label, number)
+          toolBar.AddFrame(self,
+                           TGLayoutHints(layout, 
+                                         2, 2, 2, 2))
+          self.SetToolTipText(text)
+          self.connection = Connection(self, "Clicked()",
+                                       obj, method)
+     def __del__(self):
+          pass
+#-----------------------------------------------------------------------------
 class PictureButton(TGPictureButton):
 	
 	def __init__(self, obj, toolBar,
@@ -204,16 +224,20 @@ class RadioButton(TGRadioButton):
                                          obj, method)
 	def __del__(self):
 		pass
+
+class VSlider(TGVSlider):
+     def __init__(self, obj):
+          pass
 #-----------------------------------------------------------------------------
 class NoteBook(TGTab):
 	
-	def __init__(self, obj, frame, method, width=800, height=600):
+	def __init__(self, parent, frame, method, width=800, height=600):
 		TGTab.__init__(self, frame, 1, 1)
 		
 		frame.AddFrame(self, TOP_X_Y)
 		self.connection = Connection(self, "Selected(Int_t)",
-					     obj, method)
-		self.object= obj
+					     parent, method)
+		self.parent= parent
 		self.number=-1
 		self.pages = {}
 		self.names = {}
@@ -225,7 +249,7 @@ class NoteBook(TGTab):
 	def __del__(self):
 		pass
 
-	def Add(self, name, buttons=None):
+	def Add(self, name, sidebar=None):
 		self.number += 1
 		self.names[name] = self.number
 		self.pages[self.number] = Element()
@@ -235,42 +259,44 @@ class NoteBook(TGTab):
 		element.name   = name
 		element.redraw = True
 		element.tab    = self.AddTab(name)
-		
-		# check for menu items
-		if buttons != None:
-			element.hframe2  = TGHorizontalFrame(element.tab, 1, 1)
-			element.tab.AddFrame(element.hframe2, LEFT_X)
-			element.buttonlist = []
-            		print "buttons:", buttons
-			for hstr, meth, txt, state in buttons:
-				print "==>", hstr, meth, txt, state
-				element.buttonlist.append(CheckButton(self.object,
-								      element.hframe2,
-								      hotstring=hstr,
-								      method=meth,
-								      text=txt))
-                 		element.buttonlist[-1].SetState(state)
-                                if "Board" in hstr:
-                                     self.object.wfelements.append(element.buttonlist[-1])
+                # structure
+                # +---+------------------+
+                # |+--++----------------+|
+                # ||  ||                ||
+                # ||  ||                ||
+                # ||  ||                ||
+                # ||  ||                ||
+                # |+--++----------------+|
+                # +----------------------+
+                element.hframe = TGHorizontalFrame(element.tab, 1, 1)
+                element.tab.AddFrame(element.hframe, TOP_X_Y)
 
-		element.hframe  = TGHorizontalFrame(element.tab, 1, 1)
-		element.tab.AddFrame(element.hframe, TOP_X_Y)
+		# check for menu items
+		if sidebar:
+			element.sidebar = TGVerticalFrame(element.hframe, 
+                                                          1, 1)
+			element.hframe.AddFrame(element.sidebar, TOP_LEFT)
+                        for code in sidebar: 
+                             exec(code)
+
+                element.display = TGHorizontalFrame(element.hframe, 1, 1)
+                element.hframe.AddFrame(element.display, TOP_X_Y)
 
 		from string import upper
 		standardCanvas = find(upper(name), '3D') < 0
 		if standardCanvas:
 			# set up a regular ROOT  canvas
 			element.ecanvas = TRootEmbeddedCanvas("c%s" % name,
-							      element.hframe,
+							      element.display,
 							      self.width,
 							      self.height)
 			element.canvas  = element.ecanvas.GetCanvas()
-			element.hframe.AddFrame(element.ecanvas, TOP_X_Y)
+			element.display.AddFrame(element.ecanvas, TOP_X_Y)
 		else:
 			# set up a canvas that can handle OpenGL
 			
-			element.viewer  = TGLEmbeddedViewer(element.hframe)
-			element.hframe.AddFrame(element.viewer.GetFrame(),
+			element.viewer  = TGLEmbeddedViewer(element.display)
+			element.display.AddFrame(element.viewer.GetFrame(),
 						TOP_X_Y)
                         # set sky blue background color
                         element.viewer.ColorSet().\
@@ -292,6 +318,7 @@ class NoteBook(TGTab):
 			element.canvas.AddScene(gEve.GetEventScene())
 			gEve.GetViewers().AddElement(element.canvas)
 			
+                        element.shapes = []
 			element.fixedelements = TEveElementList("fixed")
 			element.elements = TEveElementList("transients")
 			gEve.AddElement(element.fixedelements)

@@ -9,8 +9,10 @@ import sys, os, re, time, platform
 from time import ctime, sleep
 from array import array
 from HGCal.TBEventDisplay.Util import *
+from HGCal.TBEventDisplay.TBUtil import createGeometry
 from HGCal.TBEventDisplay.TBHeatMap import HeatMap
 from HGCal.TBEventDisplay.TBDisplay3D import Display3D
+from HGCal.TBEventDisplay.TBADCCounts import ADCCounts
 from HGCal.TBStandaloneSimulator.TBFileReader import TBFileReader
 from string import *
 from ROOT import *
@@ -48,8 +50,40 @@ MINDELAY  = 0.1
 
 DEBUG = 0
 
-PAGES = [(0, 'Heatmap',   'HeatMap(self, page)',   None),
-         (1, 'Display3D', 'Display3D(self, page)', None)]
+CODE3D_1 =  '''
+class Opacity:
+   def __init__(self, element):
+      self.element = element
+      self.transparent = True
+      self.transparency=99
+
+   def __del__(self):
+      pass
+
+   def toggle(self):
+      self.transparent = not self.transparent
+      if self.transparent:
+         self.transparency=99
+      else:
+         self.transparency=0
+      for shape in self.element.shapes:
+         shape.SetMainTransparency(self.transparency)
+      # force a redraw of scene
+      gEve.GetGlobalScene().SetRnrSelf(kFALSE)
+      gEve.Redraw3D()
+
+element.opacity= Opacity(element)
+element.button = CheckButton(element.opacity, 
+                             element.sidebar,
+                             hotstring='Opaque',
+                             method='toggle',
+                             text='toggle between transparent and opaque')
+'''
+
+
+PAGES = [(0, 'ADC dist.',  'ADCCounts(self, page)', None),
+         (1, 'Heatmap',    'HeatMap(self, page)',   None),
+         (2, 'Display3D',  'Display3D(self, page)', [CODE3D_1])]
 
 #-----------------------------------------------------------------------------
 # (A) Root Graphical User Interfaces (GUI)
@@ -111,7 +145,7 @@ class TBEventDisplay:
     gui = TBEventDisplay(title)
     """
 
-    def __init__(self, title, geometry='TB2016Design',
+    def __init__(self, title, geometryModule,
                  filename=None, width=WIDTH, height=HEIGHT):
 
         # Initial directory for open file dialog
@@ -124,12 +158,12 @@ class TBEventDisplay:
 
         self.Color = root.Color
         self.accumulate = False
-        self.energyCut  = 0.1 # GeV
+        self.ADCcut     = 1.0 # adc-cut
         self.cellmap    = HGCCellMap()
         # get test beam geometry
-        exec('from HGCal.TBStandaloneSimulator.%s import Geometry' % geometry)
-        self.geometry   = Geometry
+        self.geometry = createGeometry(geometry=geometryModule)
         self.shutterOpen= False
+        self.setStyle()
 
         #-------------------------------------------------------------------
         # Create main frame
@@ -171,8 +205,8 @@ class TBEventDisplay:
                           ('Set delay',   'setDelay')])
 
         self.menuBar.Add('Help',
-                 [('About', 'about'),
-                  ('Usage', 'usage')])
+                         [('About', 'about'),
+                          ('Usage', 'usage')])
 
         #-------------------------------------------------------------------
         # Add vertical frame to the main frame to contain toolbar, notebook
@@ -234,8 +268,8 @@ class TBEventDisplay:
 
         # Add pages 
         self.display = {}
-        for idd, pageName, constructor, buttons in PAGES:
-            self.noteBook.Add(pageName, buttons)
+        for idd, pageName, constructor, sidebar in PAGES:
+            self.noteBook.Add(pageName, sidebar)
             self.noteBook.SetPage(pageName)
             page = self.noteBook.page
             print '\t==> add display: %s\t-->\t%s' % (pageName, constructor)
@@ -280,7 +314,7 @@ class TBEventDisplay:
             self.__openFile(filename)
 
         # To DEBUG a display uncomment next line
-        #self.setPage(0)
+        self.setPage(1)
 
     def __del__(self):
         pass
@@ -517,6 +551,113 @@ class TBEventDisplay:
         self.DELAY = max(MINDELAY, int(1000*seconds))
         self.statusBar.SetText('delay set to: %8.2f s' % seconds, 1)
 
+
+    def setStyle(self):
+        self.style = TStyle("Pub", "Pub")
+        style = self.style
+        style.SetPalette(1)
+
+        # For the canvases
+        style.SetCanvasBorderMode(0)
+        style.SetCanvasColor(kWhite)
+
+        # For the pads
+        style.SetPadBorderMode(0)
+        style.SetPadColor(kWhite)
+        style.SetPadGridX(kFALSE)
+        style.SetPadGridY(kFALSE)
+        style.SetGridColor(kGreen)
+        style.SetGridStyle(3)
+        style.SetGridWidth(1)
+
+        # For the frames
+        style.SetFrameBorderMode(0)
+        style.SetFrameBorderSize(1)
+        style.SetFrameFillColor(0)
+        style.SetFrameFillStyle(0)
+        style.SetFrameLineColor(1)
+        style.SetFrameLineStyle(1)
+        style.SetFrameLineWidth(1)
+
+        # For the histograms
+        style.SetHistLineColor(kBlack)
+        style.SetHistLineStyle(0)
+        style.SetHistLineWidth(2)
+
+        style.SetEndErrorSize(2)
+        #style.SetErrorX(0.)
+
+        style.SetMarkerSize(0.4)
+        style.SetMarkerStyle(20)
+
+        # For the fit/function:
+        style.SetOptFit(1)
+        style.SetFitFormat("5.4g")
+        style.SetFuncColor(2)
+        style.SetFuncStyle(1)
+        style.SetFuncWidth(1)
+
+        # For the date:
+        style.SetOptDate(0)
+
+        # For the statistics box:
+        style.SetOptFile(0)
+        style.SetOptStat("")
+        # To display the mean and RMS:
+        # style.SetOptStat("mr") 
+        style.SetStatColor(kWhite)
+        style.SetStatFont(42)
+        style.SetStatFontSize(0.03)
+        style.SetStatTextColor(1)
+        style.SetStatFormat("6.4g")
+        style.SetStatBorderSize(1)
+        style.SetStatH(0.2)
+        style.SetStatW(0.3)
+
+        # Margins:
+        style.SetPadTopMargin(0.05)
+        style.SetPadBottomMargin(0.16)
+        style.SetPadLeftMargin(0.18)
+        style.SetPadRightMargin(0.18)
+
+        # For the Global title:
+        style.SetOptTitle(0) 
+        style.SetTitleFont(42)
+        style.SetTitleColor(1)
+        style.SetTitleTextColor(1)
+        style.SetTitleFillColor(10)
+        style.SetTitleFontSize(0.05)
+
+        # For the axis titles:
+        style.SetTitleColor(1, "XYZ")
+        style.SetTitleFont(42, "XYZ")
+        style.SetTitleSize(0.05, "XYZ")
+        style.SetTitleXOffset(1.25)
+        style.SetTitleYOffset(1.40)
+
+        # For the axis labels:
+        style.SetLabelColor(1, "XYZ")
+        style.SetLabelFont(42, "XYZ")
+        style.SetLabelOffset(0.020, "XYZ")
+        style.SetLabelSize(0.05, "XYZ")
+
+        # For the axis:
+        style.SetAxisColor(1, "XYZ")
+        style.SetStripDecimals(kTRUE)
+        style.SetTickLength(0.03, "XYZ")
+        style.SetNdivisions(510, "XYZ")
+        # To get tick marks on the opposite side of the frame
+        style.SetPadTickX(1)  
+        style.SetPadTickY(1)
+
+        # Change for log plots:
+        style.SetOptLogx(0)
+        style.SetOptLogy(0)
+        style.SetOptLogz(0)
+
+        # Postscript options:
+        style.SetPaperSize(20.,20.)
+        style.cd()
 #------------------------------------------------------------------------------
 def main():
     if len(sys.argv) > 1:
@@ -524,8 +665,7 @@ def main():
     else:
         filename = None
     display = TBEventDisplay('CMS HGCAL Test Beam Event Display',
-                             'TB2016Design', 
-                             filename)
+                             'TBGeometry_2016_04', filename)
     display.run()
 #------------------------------------------------------------------------------
 try:

@@ -16,22 +16,17 @@ COLOR = {'W':   kRed,
          'WCu': kOrange, 
          'PCB': kBlue, 
          'Si':  kWhite}
-
-TRANSPARENCY = {'W':   99,
-                'Cu':  99,
-                'WCu': 99,
-                'PCB': 99,
-                'Si':  97}
 #------------------------------------------------------------------------------
 class Display3D:
 
     def __init__(self, parent, page):
 
         self.cellmap = parent.cellmap
-        self.geometry= parent.geometry
-        self.nlayers = len(self.geometry)
+        # this is a 2-tuple: (geometry_description, sensitive_elements)
+        self.geometry, self.sensitive = parent.geometry
         self.page    = page
         self.first   = True
+        self.transparency = 99
 
         # some shapes might be pickable
         self.pickables = Pickable()
@@ -42,16 +37,6 @@ class Display3D:
         self.connections.append(Connection(self.pickables, 
                                            "Cleared()",
                                            self, "cleared"))
-
-        # construct (x,y) vertices of a hexagon centered at the origin
-        module  = self.geometry[0]
-        element = module[0]
-        material= element['material']
-        side = getValue(element['side'])
-        self.x, self.y = computeHexVertices(side)
-
-        gStyle.SetPalette(1)
-
     def __del__(self):
         pass
 
@@ -61,7 +46,7 @@ class Display3D:
             gEve.Redraw3D(kTRUE)
         else:
             gEve.Redraw3D(kFALSE)
-        
+ 
     def selected(self, idd):
         element = self.pickables[idd]
         # todo
@@ -86,8 +71,7 @@ class Display3D:
 
         # draw HGC modules
         if self.first:
-            for ii in xrange(self.nlayers):
-                self.drawModule(parent, ii)
+            self.drawGeometry(parent)
 
         # draw hits
         self.drawHits(parent)
@@ -99,53 +83,67 @@ class Display3D:
         #elements.AddElement(shape)
 
         self.Show()
+        if parent.shutterOpen:
+            filename = "display3d%5.5d.png" % parent.eventNumber
+            self.page.viewer.SaveAs(filename)
 
-    def drawModule(self, parent, ii):
-        module = self.geometry[ii]
-
-        for jj, element in enumerate(module):
+    def drawGeometry(self, parent):
+        for ii in xrange(len(self.geometry)):
+            element = self.geometry[ii]
             material = element['material']
             if material == 'Air': continue
 
+            # construct (x,y) vertices of a hexagon/square 
+            # centered at the origin use first sensitive layer
+            shape     = element['shape']
+            side      = element['side']
+            thickness = element['thickness']
+            if shape == 'hexagon':
+                x, y = computeHexVertices(side)
+            else:
+                x, y = computeSquareVertices(side)
             o = TGeoXtru(2)
-            o.DefinePolygon(6, self.x, self.y)
-            # args: section-number, z, x0, y0, scale=1
-            t = getValue(element['thickness'])
-            o.DefineSection(0,-t/2, 0.0, 0.0)
-            o.DefineSection(1, t/2, 0.0, 0.0)
-
-            name = '%s_layer_%d_%d' % (material, ii, jj)
+            o.DefinePolygon(len(x), x, y)
+            # args: z-section-number, z
+            o.DefineSection(0,-thickness/2)
+            o.DefineSection(1, thickness/2)
+ 
+            name = '%s_%d' % (material, ii)
             shape= TEveGeoShape(name)
             shape.SetShape(o)
             shape.SetMainColor(COLOR[material])
-            shape.SetMainTransparency(TRANSPARENCY[material])
+            shape.SetMainTransparency(self.transparency)
 
             # move to correct position
-            xpos = getValue(element['x'])
-            ypos = getValue(element['y'])
-            zpos = getValue(element['z'])
+            xpos = element['x']
+            ypos = element['y']
+            zpos = element['z']
             shape.RefMainTrans().SetPos(xpos, ypos, zpos)
-
-            shape.SetPickable(1)
-            self.pickables.AddElement(shape)
+ 
+            if material == 'Si':
+                shape.SetPickable(1)
+                self.pickables.AddElement(shape)
             self.page.fixedelements.AddElement(shape)
+            self.page.shapes.append(shape)
 
     def drawHits(self, parent):
-        maxenergy, hits = getHits(parent, self.cellmap, self.geometry)
-        if maxenergy == None: return
-
-        for ii,(energy, layer, u, v, x, y, z, size) in enumerate(hits):
-            if energy < parent.energyCut: continue
+        maxADC, hits = getHits(parent, 
+                               self.cellmap, 
+                               self.sensitive)
+        if maxADC == None: return
+        
+        for ii,(adc, layer, u, v, x, y, z) in enumerate(hits):
+            if adc < parent.ADCcut: continue
 
             name = 'hit%d_%d_%d_%d' % (parent.eventNumber, layer, u, v)
             p = TEvePointSet(name)
             p.SetNextPoint(x, y, z)
             p.SetPointId(TNamed(name, name))
             p.SetMarkerStyle(4)
-            p.SetMarkerSize(size/2)
-            color = getColor(energy/maxenergy)
+            p.SetMarkerSize(2.0)
+            color = getColor(float(adc)/maxADC)
+            print '\t%d\tcolor = %d' % (adc, color)
             p.SetMarkerColor(color)
             p.SetPickable(1)
             self.pickables.AddElement(p)
             self.page.elements.AddElement(p)
-

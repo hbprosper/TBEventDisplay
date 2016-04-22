@@ -8,14 +8,14 @@ from string import atof, lower, replace, strip, split, joinfields, find
 from array import array
 from math import *
 from ROOT import *
-#from HGCal.TBEventDisplay.Util import *
 #------------------------------------------------------------------------------
 def getValue(record):
     return atof(split(record)[0])
 
 def getColor(f):
-    ncolors = root.SetSpectrumPalette()
-    ii = int(0.99*(1-f)*ncolors)
+    gStyle.SetPalette(kDarkBodyRadiator)
+    ncolors = TColor.GetNumberOfColors()
+    ii = int(0.99*(1.0-f)*ncolors)
     return TColor.GetColorPalette(ii)
 
 def computeBinVertices(side, cellmap, cell):
@@ -83,38 +83,89 @@ def computeHexVertices(side):
     x.append( S/2); y.append(-H)
     return (x, y)
 #------------------------------------------------------------------------------
-def getHits(parent, cellmap, geometry, keyname="TBRecHit"):
+def computeSquareVertices(side):
+    # construct (x,y) vertices of a hexagon centered at the origin
+    S = side
+    H = S/2  # center to side distance
+    x = array('d')
+    y = array('d')
+    x.append(-H); y.append(-H)
+    x.append(-H); y.append( H)
+    x.append( H); y.append( H)
+    x.append( H); y.append(-H)
+    return (x, y)
+#------------------------------------------------------------------------------
+def getHits(parent, cellmap, sensitive, keyname="SKIROC2DataFrame"):
     try:
-        rechits = parent.reader(keyname)
+        skiroc = parent.reader(keyname)
     except:
         return (None, None)
 
-    maxenergy =-1.0
-    hits = []
-    wafer= {}
-    for ii in xrange(rechits.size()):
-        energy = rechits[ii].energy()
-        cellid = rechits[ii].id()
-        l = cellid.layer()
-        u = cellid.iu()
-        v = cellid.iv()
-        pos = cellmap(u, v)
-        x = pos.first
-        y = pos.second
-        #record ="cell(%3d,%3d,%3d): %8.3f GeV" % (l, u ,v, energy)
+    maxval=-1.0
+    hits  = []
+    for ii in xrange(skiroc.size()):
+        digi = SKIROC2DataFrame(skiroc[ii])
+        nsamples = digi.samples()
+        detid    = digi.detid()
+        sensor_u = detid.sensorIU()
+        sensor_v = detid.sensorIV()
+        l  = detid.layer()
+        u  = detid.iu()
+        v  = detid.iv()
+        xy = cellmap(u, v)
+        x  = xy.first
+        y  = xy.second
+        z  = sensitive[l]['z']
+        adc= digi[0].adcHigh()
+        #record ="cell(%3d,%3d,%3d): %d" % (l, u ,v, adc)
         #print record
+        hits.append((adc, l, u, v, x, y, z))
+        if adc > maxval: maxval = adc
+    return (maxval, hits)
+#------------------------------------------------------------------------------
+def createGeometry(geometry="TBGeometry_2016_04"):
+    from copy import copy
+    cmd = 'from HGCal.TBStandaloneSimulator.%s import Components, Geometry'\
+        % geometry
+    exec(cmd)
 
-        if not wafer.has_key(l):
-            parent.debug("begin new wafer")
-            # silicon wafer is last sub-layer of layer (aka module)
-            module  = geometry[l]
-            element = module[-1]
-            z    = getValue(element['z'])
-            cellside = getValue(element['cellside'])
-            wafer[l] = (z, cellside)
+    tprev = 0.0
+    layer = 0
+    z = 0.0
+    geometry  = []
+    sensitive = {}
+    for part in Geometry:
+        print part
+        comp = copy(Components[part])
+        # check for modules
+        if type(comp) == type([]):
+            for subpart in comp:
+                print '\t%s' % subpart
+                component = copy(Components[subpart])
+                t    = component['thickness']
+                side = component['side']
+                z += (t + tprev)/2
+                component['z'] = z
+                tprev = t
+                if component.has_key('sensitive'):
+                    layer += 1
+                    component['layer'] = layer
+                    sensitive[layer] = component
+                geometry.append(component)
+        else:
+            t    = comp['thickness']
+            side = comp['side']
+            z += (t + tprev)/2
+            comp['z'] = z
+            tprev = t
+            geometry.append(comp)
+    return (geometry, sensitive)
+#------------------------------------------------------------------------------
+def main():
+    # get test beam geometry
+    geom, sensitive  = createGeometry(geometry="TBGeometry_2016_04")
+    from pprint import PrettyPrinter
+    pp = PrettyPrinter()
+    pp.pprint(geom)
 
-        z, cellside = wafer[l]
-        hits.append((energy, l, u, v, x, y, z, cellside))
-        if energy > maxenergy: maxenergy = energy
-
-    return (maxenergy, hits)
+if __name__ == "__main__": main()
