@@ -312,7 +312,6 @@ class NoteBook(TGTab):
 			TEveManager.Create(kFALSE)
 
 			element.canvas = TEveViewer("Viewer")
-			
 			element.canvas.SetGLViewer(element.viewer,
 						   element.viewer.GetFrame())
 			element.canvas.AddScene(gEve.GetEventScene())

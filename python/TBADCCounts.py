@@ -28,48 +28,50 @@ class ADCCounts:
         self.canvas.Divide(xdiv, ydiv)
 
         # create a histogram for each sensor
-        nbins = 4000
+        nbins = 128
         xmin  = 0
-        xmax  = 4000
+        xmax  = 128
 
         self.hist = []
         for layer in xrange(nplots):
             name = 'ADClayer%3d' % (layer+1)
             h = TH1F(name, "", nbins, xmin, xmax)
             h.SetFillStyle(3001)
-            h.SetFillColor(kBlue)
+            h.SetFillColor(kRed)
             h.GetXaxis().CenterTitle()
-            h.GetXaxis().SetTitle("ADC count")
+            h.GetXaxis().SetTitle("channel")
             h.GetYaxis().CenterTitle()
             h.GetYaxis().SetTitle("count")
-            h.SetMinimum(parent.ADCcut)
             self.hist.append(h)
 
     def __del__(self):
         pass
 
     def Draw(self, parent):
-        if not parent.accumulate:
+        if parent.hits == None: return
+
+        # check if we are in accumulate mode
+        if parent.accumulate:
+            if parent.eventNumber % parent.skip != 0:
+                return
+        else:
             for h in self.hist:
                 h.Reset()
 
-        maxADC, hits = getHits(parent, self.cellmap, self.sensitive)
-        if maxADC == None: return
-
-        # fill sensor histogram (layers start at one)
-        for ii,(adc, layer, u, v, x, y, z) in enumerate(hits):
-            self.hist[layer-1].Fill(adc)
-
-        # now plot
-        gStyle.SetOptStat("mr") 
+        gStyle.SetOptStat("")
         for ii, h in enumerate(self.hist):
             layer = ii + 1
+            cells = parent.cells[layer]
+            for ii in xrange(cells.size()):
+                cell = cells[ii]
+                skiroc = cell.skiroc
+                channel= cell.channel
+                jj = channel + 64 * (skiroc-1) + 1
+                h.SetBinContent(jj, cell.count)
             self.canvas.cd(layer)
             h.Draw()
         self.canvas.Update()
 
         if parent.shutterOpen:
-            filename = "adccounts%5.5d.png" % parent.eventNumber
+            filename = "channels%5.5d.png" % parent.eventNumber
             self.canvas.SaveAs(filename)
-
-        gStyle.SetOptStat("") 

@@ -9,7 +9,7 @@ import sys, os, re, time, platform
 from time import ctime, sleep
 from array import array
 from HGCal.TBEventDisplay.Util import *
-from HGCal.TBEventDisplay.TBUtil import createGeometry
+from HGCal.TBEventDisplay.TBUtil import *
 from HGCal.TBEventDisplay.TBHeatMap import HeatMap
 from HGCal.TBEventDisplay.TBDisplay3D import Display3D
 from HGCal.TBEventDisplay.TBADCCounts import ADCCounts
@@ -81,7 +81,7 @@ element.button = CheckButton(element.opacity,
 '''
 
 
-PAGES = [(0, 'ADC dist.',  'ADCCounts(self, page)', None),
+PAGES = [(0, 'Channels',   'ADCCounts(self, page)', None),
          (1, 'Heatmap',    'HeatMap(self, page)',   None),
          (2, 'Display3D',  'Display3D(self, page)', [CODE3D_1])]
 
@@ -158,11 +158,18 @@ class TBEventDisplay:
 
         self.Color = root.Color
         self.accumulate = False
-        self.ADCcut     = 1.0 # adc-cut
+        self.ADCmin     = 1 
+        self.ADCmax     = 3000
+        # in accumulate mode update every self.skip events
+        self.skip       = 50
         self.cellmap    = HGCCellMap()
+        # histogram cache (one per sensor)
+        self.hist       = []
         # get test beam geometry
-        self.geometry = createGeometry(geometry=geometryModule)
+        self.geometry   = createGeometry(geometry=geometryModule)
+        self.sensitive  = self.geometry[-1]
         self.shutterOpen= False
+        # graphics style
         self.setStyle()
 
         #-------------------------------------------------------------------
@@ -201,8 +208,9 @@ class TBEventDisplay:
                           ('&Previous', 'previousEvent'),
                           ('&Goto',     'gotoEvent'),
                           0,
-                          ('Set energy cut', 'setEnergyCut'),
-                          ('Set delay',   'setDelay')])
+                          ('Set min[ADC]', 'setADCmin'),
+                          ('Set max[ADC]', 'setADCmax'),
+                          ('Set delay',    'setDelay')])
 
         self.menuBar.Add('Help',
                          [('About', 'about'),
@@ -310,11 +318,14 @@ class TBEventDisplay:
         self.main.Resize()
         self.main.MapWindow()
 
+        # create 2-D histograms for each sensor
+        self.initDataCache()
+
         if filename != None: 
             self.__openFile(filename)
 
         # To DEBUG a display uncomment next line
-        self.setPage(1)
+        #self.setPage(0)
 
     def __del__(self):
         pass
@@ -507,6 +518,7 @@ class TBEventDisplay:
                                        (self.eventNumber, self.nevents-1),
                                    0)            
             self.reader.read(self.eventNumber)
+            self.fillDataCache()
 
         elif which == R_FORWARD:
             if self.eventNumber < self.nevents-1:
@@ -515,6 +527,7 @@ class TBEventDisplay:
                                            (self.eventNumber, self.nevents-1),
                                        0)
                 self.reader.read(self.eventNumber)
+                self.fillDataCache()
         else:
             if self.eventNumber > 0:
                 self.eventNumber -= 1
@@ -522,6 +535,7 @@ class TBEventDisplay:
                                            (self.eventNumber, self.nevents-1),
                                        0)
                 self.reader.read(self.eventNumber)
+                self.fillDataCache()
 
         if self.eventNumber <= 0 or self.eventNumber >= self.nevents-1:
             self.stopPlayer()
@@ -534,13 +548,98 @@ class TBEventDisplay:
 
         self.debug("end:readEvent")
 
-    def setEnergyCut(self):
+    
+    def initDataCache(self):
+        from copy import copy
+        # -------------------------------------------------------------
+        # create a histogram for each sensor
+        # Note: in offline, layers start at 1
+        # -------------------------------------------------------------
+        self.cells = {}
+        for l in xrange(len(self.sensitive)):
+            layer = l + 1
+            # we assume the cells for each layer to be identical
+            self.cells[layer] = copy(self.cellmap.cells())
+            cells = self.cells[layer] # make an alias
+
+            element = self.sensitive[layer]
+            cellside= element['cellside']
+            side    = element['side']
+            z       = element['z']
+
+            poly = TH2Poly()
+            poly.SetName('layer %3d' % layer)
+            poly.SetTitle('layer %3d' % layer)
+            poly.GetXaxis().CenterTitle()
+            poly.GetXaxis().SetTitle("#font[12]{x} axis")
+            poly.GetYaxis().CenterTitle()
+            poly.GetYaxis().SetTitle("#font[12]{y} axis")
+
+            # populate histogram with cells
+            for ii in xrange(cells.size()):
+                cells[ii].z = z
+                xv, yv = computeBinVertices(cellside, cells[ii])
+                poly.AddBin(len(xv), xv, yv)
+
+            # cache sensor histogram
+            self.hist.append(poly)
+
+    def fillDataCache(self):
+        # -------------------------------------------------------------
+        if not self.accumulate:
+            for h in self.hist:
+                h.ClearBinContents()
+
+        self.hits = getHits(self, self.cellmap, self.sensitive)
+        if self.hits == None: return
+
+        # fill sensor histograms
+        layers = self.hits.keys()
+        layers.sort()
+        for layer in layers:
+            for hit in self.hits[layer]:
+                adc, u, v, x, y, z = hit
+                self.hist[layer-1].Fill(x, y, adc)
+                
+                #record ="cell(%3d,%3d,%3d|%6.2f,%6.2f): %d" % \
+                #    (layer, u ,v, x, y, adc)
+                #print record
+
+        # copy histogram counts into cell objects
+        for l, h in enumerate(self.hist):
+            layer = l + 1
+            cells = self.cells[layer] # make an alias
+            for ii in xrange(cells.size()):
+                cell = cells[ii]
+                cell.count = h.GetBinContent(ii+1)
+
+        # set all histograms to minimum and maximum values
+        self.maxCount = -1
+        for h in self.hist:
+            y = h.GetMaximum()
+            if y > self.maxCount:
+                self.maxCount = y
+
+        for h in self.hist:
+            h.SetMinimum(self.ADCmin)
+            if self.ADCmax > 0:
+                h.SetMaximum(self.ADCmax)
+            else:
+                h.SetMaximum(1.05*self.maxCount)
+
+    def setADCmin(self):
         from string import atof
         dialog = Dialog(self.root, self.main)
-        self.energyCut = atof(dialog.GetInput('enter cell energy cut', 
-                                              '%10.3f' % self.energyCut))
-        self.statusBar.SetText('energy cut set to: %8.2f GeV' % \
-                                   self.energyCut, 1)	
+        self.ADCmin = atof(dialog.GetInput('enter min[ADC] count', 
+                                           '%d' % self.ADCmin))
+        self.statusBar.SetText('min[ADC] set to: %d' % self.ADCmin, 1)	
+
+    def setADCmax(self):
+        from string import atof
+        dialog = Dialog(self.root, self.main)
+        self.ADCmax = atof(dialog.GetInput('enter max[ADC] count', 
+                                           '%d' % self.ADCmax))
+        self.statusBar.SetText('max[ADC] set to: %d' % self.ADCmax, 2600)	
 
     def setDelay(self):
         from string import atof
@@ -555,6 +654,7 @@ class TBEventDisplay:
     def setStyle(self):
         self.style = TStyle("Pub", "Pub")
         style = self.style
+        #style.SetPalette(kRainBow)
         style.SetPalette(1)
 
         # For the canvases

@@ -9,21 +9,13 @@ from array import array
 from math import *
 from ROOT import *
 #------------------------------------------------------------------------------
-def getValue(record):
-    return atof(split(record)[0])
-
-def getColor(f):
-    gStyle.SetPalette(kDarkBodyRadiator)
-    ncolors = TColor.GetNumberOfColors()
-    ii = int(0.99*(1.0-f)*ncolors)
+def getColor(y, ymax):
+    f  = float(min(y, ymax))/ymax
+    ii = int(0.99*f*TColor.GetNumberOfColors())
     return TColor.GetColorPalette(ii)
 
-def computeBinVertices(side, cellmap, cell):
-    pos, posid = cell.first, cell.second
-    u, v = pos.first, pos.second
-    pos  = cellmap(u, v)
-    x0,y0= pos.first, pos.second
-
+def computeBinVertices(side, cell):
+    x0, y0, posid = cell.x, cell.y, cell.type
     # construct (x,y) vertices of a hexagon or half-hexagon, 
     # centered at (x0,y0)
     S = float(side)
@@ -99,10 +91,9 @@ def getHits(parent, cellmap, sensitive, keyname="SKIROC2DataFrame"):
     try:
         skiroc = parent.reader(keyname)
     except:
-        return (None, None)
+        return None
 
-    maxval=-1.0
-    hits  = []
+    hits = {}
     for ii in xrange(skiroc.size()):
         digi = SKIROC2DataFrame(skiroc[ii])
         nsamples = digi.samples()
@@ -112,16 +103,14 @@ def getHits(parent, cellmap, sensitive, keyname="SKIROC2DataFrame"):
         l  = detid.layer()
         u  = detid.iu()
         v  = detid.iv()
-        xy = cellmap(u, v)
+        xy = cellmap.uv2xy(u, v)
         x  = xy.first
         y  = xy.second
         z  = sensitive[l]['z']
         adc= digi[0].adcHigh()
-        #record ="cell(%3d,%3d,%3d): %d" % (l, u ,v, adc)
-        #print record
-        hits.append((adc, l, u, v, x, y, z))
-        if adc > maxval: maxval = adc
-    return (maxval, hits)
+        if not hits.has_key(l): hits[l] = []
+        hits[l].append((adc, u, v, x, y, z))
+    return hits
 #------------------------------------------------------------------------------
 def createGeometry(geometry="TBGeometry_2016_04"):
     from copy import copy

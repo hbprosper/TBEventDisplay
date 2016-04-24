@@ -11,7 +11,7 @@ from array import array
 from math import *
 from HGCal.TBEventDisplay.TBUtil import *
 #------------------------------------------------------------------------------
-COLOR = {'W':   kRed,
+COLOR = {'W':   kRed-3,
          'Cu':  kYellow+2,  
          'WCu': kOrange, 
          'PCB': kBlue, 
@@ -62,7 +62,11 @@ class Display3D:
 
         # either add more objects to existing
         # picture or refresh
-        if not parent.accumulate:
+        # check if we are in accumulate mode
+        if parent.accumulate:
+            if parent.eventNumber % parent.skip != 0:
+                return
+        else:
             self.page.elements.DestroyElements()
 
         # clear all pickables from the list
@@ -76,6 +80,10 @@ class Display3D:
         # draw hits
         self.drawHits(parent)
 
+        # set camera
+        camera = gEve.GetDefaultGLViewer().CurrentCamera()
+        camera.RotateRad(1.5, 1.5)
+
         #shape = TEveText('#font[12]{The Time Has Come}')
         #shape.SetMainColor(kBlack)
         #shape.SetFontSize(14)
@@ -83,8 +91,9 @@ class Display3D:
         #elements.AddElement(shape)
 
         self.Show()
+
         if parent.shutterOpen:
-            filename = "display3d%5.5d.png" % parent.eventNumber
+            filename = "display3d%5.5d.cc" % parent.eventNumber
             self.page.viewer.SaveAs(filename)
 
     def drawGeometry(self, parent):
@@ -127,23 +136,24 @@ class Display3D:
             self.page.shapes.append(shape)
 
     def drawHits(self, parent):
-        maxADC, hits = getHits(parent, 
-                               self.cellmap, 
-                               self.sensitive)
-        if maxADC == None: return
+        if parent.hits == None: return
         
-        for ii,(adc, layer, u, v, x, y, z) in enumerate(hits):
-            if adc < parent.ADCcut: continue
+        for l in xrange(len(parent.cells)):
+            layer = l + 1
+            cells = parent.cells[layer]
+            for ii in xrange(cells.size()):
+                cell = cells[ii]
+                if cell.count < parent.ADCmin: continue
 
-            name = 'hit%d_%d_%d_%d' % (parent.eventNumber, layer, u, v)
-            p = TEvePointSet(name)
-            p.SetNextPoint(x, y, z)
-            p.SetPointId(TNamed(name, name))
-            p.SetMarkerStyle(4)
-            p.SetMarkerSize(2.0)
-            color = getColor(float(adc)/maxADC)
-            print '\t%d\tcolor = %d' % (adc, color)
-            p.SetMarkerColor(color)
-            p.SetPickable(1)
-            self.pickables.AddElement(p)
-            self.page.elements.AddElement(p)
+                name = 'hit%d_%d_%d_%d' % (parent.eventNumber, 
+                                           layer, cell.u, cell.v)
+                p = TEvePointSet(name)
+                p.SetNextPoint(cell.x, cell.y, cell.z)
+                p.SetPointId(TNamed(name, name))
+                p.SetMarkerStyle(4)
+                p.SetMarkerSize(2.0)
+                color = getColor(cell.count, parent.ADCmax)
+                p.SetMarkerColor(color)
+                p.SetPickable(1)
+                self.pickables.AddElement(p)
+                self.page.elements.AddElement(p)

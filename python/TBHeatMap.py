@@ -13,9 +13,12 @@ from ROOT import *
 class HeatMap:
 
     def __init__(self, parent, page):
-        self.cellmap = parent.cellmap
-        self.geometry, self.sensitive = parent.geometry
+        self.parent  = parent
+        self.page    = page
         self.canvas  = page.canvas
+        self.cellmap = parent.cellmap
+        self.hist    = parent.hist
+        self.geometry, self.sensitive = parent.geometry
 
         # try to figure out an arrangement of plots on the
         # canvas
@@ -32,7 +35,6 @@ class HeatMap:
         layer   = 1
         element = self.sensitive[layer]
         side    = element['side']
-
         self.wafer = TH2Poly()
         self.wafer.SetName('wafer')
         self.wafer.SetTitle('wafer')
@@ -43,26 +45,10 @@ class HeatMap:
         xv, yv  = computeHexVertices(side)
         self.wafer.AddBin(len(xv), xv, yv)
 
-        # create a histogram for each sensor
-        self.hist = []
-        cellside  = element['cellside']
-        cells = self.cellmap.cells()
-        for layer in xrange(nplots):
-            poly = TH2Poly()
-            poly.SetName('layer %3d' % (layer+1))
-            poly.SetTitle('layer %3d' % (layer+1))
-            poly.GetXaxis().CenterTitle()
-            poly.GetXaxis().SetTitle("#font[12]{x} axis")
-            poly.GetYaxis().CenterTitle()
-            poly.GetYaxis().SetTitle("#font[12]{y} axis")
-            poly.SetMinimum(0)
-            self.hist.append(poly)
-
-            # populate with cells
-            for ii in xrange(cells.size()):
-                xv,yv = computeBinVertices(cellside, self.cellmap, cells[ii])
-                poly.AddBin(len(xv), xv, yv)
-            self.canvas.cd(layer+1)
+        # draw a wafer outline for each wafer
+        for l in xrange(nplots):
+            layer = l + 1
+            self.canvas.cd(layer)
             self.wafer.Draw()
         self.canvas.Update()
 
@@ -70,33 +56,32 @@ class HeatMap:
         pass
 
     def Draw(self, parent):
-        if not parent.accumulate:
-            for h in self.hist:
-                h.ClearBinContents()
+        if parent.hits == None: return
 
-        maxADC, hits = getHits(parent, self.cellmap, self.sensitive)
-        if maxADC == None: return
-
-        # fill sensor histograms
-        # layers start at zero
-        for ii,(adc, layer, u, v, x, y, z) in enumerate(hits):
-            self.hist[layer-1].Fill(x, y, adc)
-
-        # get maximum
-        maxcount = -1.0
-        for layer, h in enumerate(self.hist):
-            count = h.GetMaximum()
-            if count > maxcount:
-                maxcount = count
+        # check if we are in accumulate mode
+        if parent.accumulate:
+            if parent.eventNumber % parent.skip != 0:
+                return
 
         gStyle.SetOptStat("")
-        # now plot
-        for layer, h in enumerate(self.hist):
-            self.canvas.cd(layer+1)
-            h.SetMinimum(parent.ADCcut)
-            #h.SetMaximum(maxcount)
+        self.text = TText()
+        self.text.SetTextSize(0.02)
+        self.text.SetTextAlign(22)  # centered
+
+        for l, h in enumerate(self.hist):
+            layer = l + 1
+            cells = parent.cells[layer]
+
+            self.canvas.cd(layer)
             h.Draw("colz")
             self.wafer.Draw("same")
+            if len(self.hist) > 4: continue
+
+            for ii in xrange(cells.size()):
+                cell = cells[ii]
+                if cell.count < parent.ADCmin: continue
+                self.text.DrawText(cell.x, cell.y, "%d" % cell.count)
+
         self.canvas.Update()
 
         if parent.shutterOpen:
