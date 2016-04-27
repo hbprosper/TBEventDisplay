@@ -7,6 +7,7 @@
 import sys, os, re
 from string import atof, lower, replace, strip, split, joinfields, find
 from HGCal.TBEventDisplay.TBUtil import *
+from HGCal.TBStandaloneSimulator.TBGeometryUtil import *
 from math import *
 from ROOT import *
 #------------------------------------------------------------------------------
@@ -27,7 +28,7 @@ class HeatMap:
         xdiv = n
         ydiv = n
         if xdiv*ydiv < self.nlayers: ydiv += 1
-        nplots = min(xdiv*ydiv, self.nlayers)
+        self.nplots = min(xdiv*ydiv, self.nlayers)
         self.canvas.Divide(xdiv, ydiv)
 
         # construct a hexagon centered at the origin to
@@ -46,7 +47,7 @@ class HeatMap:
         self.wafer.AddBin(len(xv), xv, yv)
 
         # draw a wafer outline for each wafer
-        for l in xrange(nplots):
+        for l in xrange(self.nplots):
             layer = l + 1
             self.canvas.cd(layer)
             self.wafer.Draw()

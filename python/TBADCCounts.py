@@ -7,6 +7,7 @@
 import sys, os, re
 from string import atof, lower, replace, strip, split, joinfields, find
 from HGCal.TBEventDisplay.TBUtil import *
+from HGCal.TBStandaloneSimulator.TBGeometryUtil import *
 from math import *
 from ROOT import *
 #------------------------------------------------------------------------------
@@ -24,7 +25,7 @@ class ADCCounts:
         xdiv = n
         ydiv = n
         if xdiv*ydiv < self.nlayers: ydiv += 1
-        nplots = min(xdiv*ydiv, self.nlayers)
+        self.nplots = min(xdiv*ydiv, self.nlayers)
         self.canvas.Divide(xdiv, ydiv)
 
         # create a histogram for each sensor
@@ -33,7 +34,7 @@ class ADCCounts:
         xmax  = 128
 
         self.hist = []
-        for layer in xrange(nplots):
+        for layer in xrange(self.nplots):
             name = 'ADClayer%3d' % (layer+1)
             h = TH1F(name, "", nbins, xmin, xmax)
             h.SetFillStyle(3001)
@@ -63,7 +64,7 @@ class ADCCounts:
             layer = ii + 1
             cells = parent.cells[layer]
             for ii in xrange(cells.size()):
-                cell = cells[ii]
+                cell   = cells[ii]
                 skiroc = cell.skiroc
                 channel= cell.channel
                 jj = channel + 64 * (skiroc-1) + 1

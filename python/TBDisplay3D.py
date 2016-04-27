@@ -10,6 +10,7 @@ from string import atof, lower, replace, strip, split, joinfields, find
 from array import array
 from math import *
 from HGCal.TBEventDisplay.TBUtil import *
+from HGCal.TBStandaloneSimulator.TBGeometryUtil import *
 #------------------------------------------------------------------------------
 COLOR = {'W':   kRed-3,
          'Cu':  kYellow+2,  
@@ -24,6 +25,7 @@ class Display3D:
         self.cellmap = parent.cellmap
         # this is a 2-tuple: (geometry_description, sensitive_elements)
         self.geometry, self.sensitive = parent.geometry
+        self.nlayers = len(self.sensitive)
         self.page    = page
         self.first   = True
         self.transparency = 99
@@ -138,7 +140,7 @@ class Display3D:
     def drawHits(self, parent):
         if parent.hits == None: return
         
-        for l in xrange(len(parent.cells)):
+        for l in xrange(self.nlayers):
             layer = l + 1
             cells = parent.cells[layer]
             for ii in xrange(cells.size()):

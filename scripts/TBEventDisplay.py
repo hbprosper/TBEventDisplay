@@ -14,6 +14,7 @@ from HGCal.TBEventDisplay.TBHeatMap import HeatMap
 from HGCal.TBEventDisplay.TBDisplay3D import Display3D
 from HGCal.TBEventDisplay.TBADCCounts import ADCCounts
 from HGCal.TBStandaloneSimulator.TBFileReader import TBFileReader
+from HGCal.TBStandaloneSimulator.TBGeometryUtil import *
 from string import *
 from ROOT import *
 #------------------------------------------------------------------------------
@@ -325,7 +326,7 @@ class TBEventDisplay:
             self.__openFile(filename)
 
         # To DEBUG a display uncomment next line
-        #self.setPage(0)
+        #self.setPage(2)
 
     def __del__(self):
         pass
@@ -559,7 +560,7 @@ class TBEventDisplay:
         for l in xrange(len(self.sensitive)):
             layer = l + 1
             # we assume the cells for each layer to be identical
-            self.cells[layer] = copy(self.cellmap.cells())
+            self.cells[layer] = copy(self.cellmap.cells(layer))
             cells = self.cells[layer] # make an alias
 
             element = self.sensitive[layer]
