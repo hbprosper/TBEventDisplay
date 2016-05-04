@@ -15,7 +15,8 @@ class ADCCounts:
 
     def __init__(self, parent, page):
         self.cellmap = parent.cellmap
-        self.geometry, self.sensitive = parent.geometry
+        self.geometry  = parent.geometry
+        self.sensitive = parent.sensitive
         self.canvas  = page.canvas
 
         # try to figure out an arrangement of plots on the

@@ -33,7 +33,7 @@ def getHits(parent, cellmap, sensitive, keyname="SKIROC2DataFrame"):
         xy = cellmap.uv2xy(u, v)
         x  = xy.first
         y  = xy.second
-        z  = sensitive[l]['z']
+        z  = parent.geometry[sensitive[l]]['z']
         adc= digi[0].adcHigh()
         if not hits.has_key(l): hits[l] = []
         hits[l].append((adc, u, v, x, y, z))

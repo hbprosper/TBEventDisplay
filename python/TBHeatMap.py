@@ -19,7 +19,9 @@ class HeatMap:
         self.canvas  = page.canvas
         self.cellmap = parent.cellmap
         self.hist    = parent.hist
-        self.geometry, self.sensitive = parent.geometry
+
+        self.geometry  = parent.geometry
+        self.sensitive = parent.sensitive
 
         # try to figure out an arrangement of plots on the
         # canvas
@@ -34,7 +36,7 @@ class HeatMap:
         # construct a hexagon centered at the origin to
         # represent sensor
         layer   = 1
-        element = self.sensitive[layer]
+        element = self.geometry[self.sensitive[layer]]
         side    = element['side']
         self.wafer = TH2Poly()
         self.wafer.SetName('wafer')

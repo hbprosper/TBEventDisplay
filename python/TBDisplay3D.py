@@ -24,7 +24,8 @@ class Display3D:
 
         self.cellmap = parent.cellmap
         # this is a 2-tuple: (geometry_description, sensitive_elements)
-        self.geometry, self.sensitive = parent.geometry
+        self.geometry  = parent.geometry
+        self.sensitive = parent.sensitive
         self.nlayers = len(self.sensitive)
         self.page    = page
         self.first   = True

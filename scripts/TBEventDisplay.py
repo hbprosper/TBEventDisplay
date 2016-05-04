@@ -167,8 +167,9 @@ class TBEventDisplay:
         # histogram cache (one per sensor)
         self.hist       = []
         # get test beam geometry
-        self.geometry   = createGeometry(geometry=geometryModule)
-        self.sensitive  = self.geometry[-1]
+        geometry        = createGeometry(geometry=geometryModule)
+        self.geometry   = geometry['geometry']
+        self.sensitive  = geometry['sensitive']
         self.shutterOpen= False
         # graphics style
         self.setStyle()
@@ -563,7 +564,13 @@ class TBEventDisplay:
             self.cells[layer] = copy(self.cellmap.cells(layer))
             cells = self.cells[layer] # make an alias
 
-            element = self.sensitive[layer]
+
+            #from pprint import PrettyPrinter
+            #pp = PrettyPrinter()
+            #pp.pprint(self.geometry)
+            #print self.sensitive[layer]
+
+            element = self.geometry[self.sensitive[layer]]
             cellside= element['cellside']
             side    = element['side']
             z       = element['z']
