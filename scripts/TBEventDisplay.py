@@ -171,6 +171,7 @@ class TBEventDisplay:
         self.geometry   = geometry['geometry']
         self.sensitive  = geometry['sensitive']
         self.shutterOpen= False
+
         # graphics style
         self.setStyle()
 
@@ -571,7 +572,19 @@ class TBEventDisplay:
             #print self.sensitive[layer]
 
             element = self.geometry[self.sensitive[layer]]
-            cellside= element['cellside']
+            if not element.has_key('cellsize'):
+                sys.exit('** keyword cellsize not found - check %s' % \
+                             geometryModule)
+
+            if not element.has_key('side'):
+                sys.exit('** keyword side not found - check %s' % \
+                             geometryModule)
+
+            if not element.has_key('z'):
+                sys.exit('** keyword z not found - check %s' % \
+                             geometryModule)
+
+            cellside= element['cellsize']
             side    = element['side']
             z       = element['z']
 
