@@ -10,9 +10,12 @@ from time import ctime, sleep
 from array import array
 from HGCal.TBEventDisplay.Util import *
 from HGCal.TBEventDisplay.TBUtil import *
-from HGCal.TBEventDisplay.TBHeatMap import HeatMap
-from HGCal.TBEventDisplay.TBDisplay3D import Display3D
+
 from HGCal.TBEventDisplay.TBADCCounts import ADCCounts
+from HGCal.TBEventDisplay.TBHeatMap import HeatMap
+from HGCal.TBEventDisplay.TBLego import Lego
+from HGCal.TBEventDisplay.TBDisplay3D import Display3D
+
 from HGCal.TBStandaloneSimulator.TBFileReader import TBFileReader
 from HGCal.TBStandaloneSimulator.TBGeometryUtil import *
 from string import *
@@ -47,7 +50,7 @@ R_REWIND  =-1
 R_ONESHOT = 0
 R_FORWARD = 1
 
-MINDELAY  = 0.1
+MINDELAY  = 0.2
 
 DEBUG = 0
 
@@ -83,8 +86,9 @@ element.button = CheckButton(element.opacity,
 
 
 PAGES = [(0, 'Channels',   'ADCCounts(self, page)', None),
-         (1, 'Heatmap',    'HeatMap(self, page)',   None),
-         (2, 'Display3D',  'Display3D(self, page)', [CODE3D_1])]
+         (1, 'HeatMap',    'HeatMap(self, page)',   None),
+         (2, 'LegoPlot',   'Lego(self, page)',      None),
+         (3, 'Display3D',  'Display3D(self, page)', [CODE3D_1])]
 
 #-----------------------------------------------------------------------------
 # (A) Root Graphical User Interfaces (GUI)
@@ -564,7 +568,6 @@ class TBEventDisplay:
             # we assume the cells for each layer to be identical
             self.cells[layer] = copy(self.cellmap.cells(layer))
             cells = self.cells[layer] # make an alias
-
 
             #from pprint import PrettyPrinter
             #pp = PrettyPrinter()

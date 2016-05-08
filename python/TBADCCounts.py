@@ -21,13 +21,8 @@ class ADCCounts:
 
         # try to figure out an arrangement of plots on the
         # canvas
-        self.nlayers= len(self.sensitive)
-        n = int(sqrt(self.nlayers+1))
-        xdiv = n
-        ydiv = n
-        if xdiv*ydiv < self.nlayers: ydiv += 1
-        self.nplots = min(xdiv*ydiv, self.nlayers)
-        self.canvas.Divide(xdiv, ydiv)
+        self.nlayers = len(self.sensitive)
+        self.nplots  = divideCanvas(self.nlayers, self.canvas)
 
         # create a histogram for each sensor
         nbins = 128
@@ -53,10 +48,7 @@ class ADCCounts:
         if parent.hits == None: return
 
         # check if we are in accumulate mode
-        if parent.accumulate:
-            if parent.eventNumber % parent.skip != 0:
-                return
-        else:
+        if not parent.accumulate:
             for h in self.hist:
                 h.Reset()
 

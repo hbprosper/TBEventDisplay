@@ -63,14 +63,8 @@ class Display3D:
     #----------------------------------------------------------------------
     def Draw(self, parent):	
 
-        # either add more objects to existing
-        # picture or refresh
-        # check if we are in accumulate mode
-        if parent.accumulate:
-            if parent.eventNumber % parent.skip != 0:
-                return
-        else:
-            self.page.elements.DestroyElements()
+        # clear previous hits
+        self.page.elements.DestroyElements()
 
         # clear all pickables from the list
         # of selected pickables
@@ -84,8 +78,8 @@ class Display3D:
         self.drawHits(parent)
 
         # set camera
-        camera = gEve.GetDefaultGLViewer().CurrentCamera()
-        camera.RotateRad(1.5, 1.5)
+        # camera = gEve.GetDefaultGLViewer().CurrentCamera()
+        # camera.RotateRad(1.5, 1.5)
 
         #shape = TEveText('#font[12]{The Time Has Come}')
         #shape.SetMainColor(kBlack)
