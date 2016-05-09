@@ -149,7 +149,7 @@ class Display3D:
                 p.SetPointId(TNamed(name, name))
                 p.SetMarkerStyle(4)
                 p.SetMarkerSize(2.0)
-                color = getColor(cell.count, parent.ADCmax)
+                color = getColor(cell.count, parent.maxCount)
                 p.SetMarkerColor(color)
                 p.SetPickable(1)
                 self.pickables.AddElement(p)

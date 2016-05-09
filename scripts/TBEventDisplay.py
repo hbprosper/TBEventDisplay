@@ -179,6 +179,9 @@ class TBEventDisplay:
         # graphics style
         self.setStyle()
 
+        # create 2-D histograms for each sensor
+        self.initDataCache()
+
         #-------------------------------------------------------------------
         # Create main frame
         #-------------------------------------------------------------------
@@ -324,9 +327,6 @@ class TBEventDisplay:
         self.main.MapSubwindows()
         self.main.Resize()
         self.main.MapWindow()
-
-        # create 2-D histograms for each sensor
-        self.initDataCache()
 
         if filename != None: 
             self.__openFile(filename)
@@ -637,19 +637,18 @@ class TBEventDisplay:
                 cell = cells[ii]
                 cell.count = h.GetBinContent(ii+1)
 
-        # set all histograms to minimum and maximum values
         self.maxCount = -1
         for h in self.hist:
             y = h.GetMaximum()
             if y > self.maxCount:
                 self.maxCount = y
 
+        self.maxCount *= 1.1
+        # set all histograms to minimum value
+
         for h in self.hist:
             h.SetMinimum(self.ADCmin)
-            if self.ADCmax > 0:
-                h.SetMaximum(self.ADCmax)
-            else:
-                h.SetMaximum(1.05*self.maxCount)
+            #h.SetMaximum(self.maxCount)
 
     def setADCmin(self):
         from string import atof
@@ -663,7 +662,7 @@ class TBEventDisplay:
         dialog = Dialog(self.root, self.main)
         self.ADCmax = atof(dialog.GetInput('enter max[ADC] count', 
                                            '%d' % self.ADCmax))
-        self.statusBar.SetText('max[ADC] set to: %d' % self.ADCmax, 2600)	
+        self.statusBar.SetText('max[ADC] set to: %d' % self.ADCmax, 3000)	
 
     def setDelay(self):
         from string import atof
@@ -785,11 +784,20 @@ class TBEventDisplay:
 #------------------------------------------------------------------------------
 def main():
     if len(sys.argv) > 1:
-        filename = sys.argv[1]
+        geometry = sys.argv[1]
+    else:
+        sys.exit('''
+Usage:
+     TBEventDisplay.py <geometry-file> [root-file]
+''')
+
+    if len(sys.argv) > 2:
+        filename = sys.argv[2]
     else:
         filename = None
+
     display = TBEventDisplay('CMS HGCAL Test Beam Event Display',
-                             'TBGeometry_2016_04', filename)
+                             geometry, filename)
     display.run()
 #------------------------------------------------------------------------------
 try:

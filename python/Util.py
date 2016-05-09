@@ -62,6 +62,22 @@ LIGHTYELLOW = root.Color("lightyellow")
 LIGHTGREEN  = root.Color("lightgreen")
 SKYBLUE     = (0.62, 0.57, 0.98)
 #-----------------------------------------------------------------------------
+GLCANVAS = '''
+#include "TRootEmbeddedCanvas.h"
+#include "TStyle.h"
+TRootEmbeddedCanvas* TRootEmbeddedGLCanvas(const char* name, 
+                                           TGWindow*    p, 
+                                           unsigned int w, 
+                                           unsigned int h)
+{
+  gStyle->SetCanvasPreferGL(true);
+  TRootEmbeddedCanvas* embedded = new TRootEmbeddedCanvas(name, p, w, h);
+  //gStyle->SetCanvasPreferGL(false);
+  return embedded;
+}
+'''
+gROOT.ProcessLine(GLCANVAS)
+
 class Element:
 	pass
 
@@ -283,46 +299,50 @@ class NoteBook(TGTab):
                 element.hframe.AddFrame(element.display, TOP_X_Y)
 
 		from string import upper
+                
 		standardCanvas = find(upper(name), '3D') < 0
 		if standardCanvas:
-			# set up a regular ROOT  canvas
-			element.ecanvas = TRootEmbeddedCanvas("c%s" % name,
-							      element.display,
-							      self.width,
-							      self.height)
-			element.canvas  = element.ecanvas.GetCanvas()
-			element.display.AddFrame(element.ecanvas, TOP_X_Y)
+                     # set up a regular ROOT  canvas
+                     if find(upper(name), 'LEGO') > -1:
+                          element.ecanvas \
+                              = TRootEmbeddedGLCanvas("c%s" % name,
+                                                      element.display,
+                                                      self.width,
+                                                      self.height)
+                     else:
+                          element.ecanvas = TRootEmbeddedCanvas("c%s" % name,
+                                                                element.display,
+                                                                self.width,
+                                                                self.height)
+                     element.canvas  = element.ecanvas.GetCanvas()
+                     element.display.AddFrame(element.ecanvas, TOP_X_Y)
 		else:
-			# set up a canvas that can handle OpenGL
+                     # set up a canvas that can handle 3D displays
 			
-			element.viewer  = TGLEmbeddedViewer(element.display)
-			element.display.AddFrame(element.viewer.GetFrame(),
-						TOP_X_Y)
-                        # set sky blue background color
-                        element.viewer.ColorSet().\
-                            Background().SetColor(SKYBLUE[0],
-                                                  SKYBLUE[1],
-                                                  SKYBLUE[2])
+                     element.viewer  = TGLEmbeddedViewer(element.display)
+                     element.display.AddFrame(element.viewer.GetFrame(),
+                                              TOP_X_Y)
+                     # set sky blue background color
+                     bkg = element.viewer.ColorSet().Background()
+                     bkg.SetColor(SKYBLUE[0], SKYBLUE[1], SKYBLUE[2])
+                     # draw axes
+                     root.DrawAxes(element.viewer)
+                     
+                     # we want our own simplified gui
+                     #TEveManager.Create(kFALSE, 'l')
+                     TEveManager.Create(kFALSE)
 
-                        # draw axes
-                        root.DrawAxes(element.viewer)
-
-                        # we want our own simplified gui
-			#TEveManager.Create(kFALSE, 'l')
-			TEveManager.Create(kFALSE)
-
-			element.canvas = TEveViewer("Viewer")
-			element.canvas.SetGLViewer(element.viewer,
-						   element.viewer.GetFrame())
-			element.canvas.AddScene(gEve.GetEventScene())
-			gEve.GetViewers().AddElement(element.canvas)
+                     element.canvas = TEveViewer("Viewer")
+                     element.canvas.SetGLViewer(element.viewer,
+                                                element.viewer.GetFrame())
+                     element.canvas.AddScene(gEve.GetEventScene())
+                     gEve.GetViewers().AddElement(element.canvas)
 			
-                        element.shapes = []
-			element.fixedelements = TEveElementList("fixed")
-			element.elements = TEveElementList("transients")
-			gEve.AddElement(element.fixedelements)
-			gEve.AddElement(element.elements)
-
+                     element.shapes = []
+                     element.fixedelements = TEveElementList("fixed")
+                     element.elements = TEveElementList("transients")
+                     gEve.AddElement(element.fixedelements)
+                     gEve.AddElement(element.elements)
 
 	def SetPage(self, idd):
 

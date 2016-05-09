@@ -53,6 +53,7 @@ class ADCCounts:
                 h.Reset()
 
         gStyle.SetOptStat("")
+        ymax = 0.0
         for ii, h in enumerate(self.hist):
             layer = ii + 1
             cells = parent.cells[layer]
@@ -60,9 +61,18 @@ class ADCCounts:
                 cell   = cells[ii]
                 skiroc = cell.skiroc
                 channel= cell.channel
-                jj = channel + 64 * (skiroc-1) + 1
+                ski = (skiroc+1) % 2
+                jj = channel + 64 * ski + 1
                 h.SetBinContent(jj, cell.count)
+                if cell.count > ymax:
+                    ymax = cell.count
             self.canvas.cd(layer)
+
+        ymax *= 1.1
+        for ii, h in enumerate(self.hist):
+            layer = ii + 1
+            self.canvas.cd(layer)
+            h.SetMaximum(ymax)
             h.Draw()
         self.canvas.Update()
 

@@ -17,7 +17,7 @@ class Lego:
         self.parent  = parent
         self.page    = page
         self.canvas  = page.canvas
-        self.cellmap = parent.cellmap
+        self.cellmap = parent.cellmap        
         self.geometry  = parent.geometry
         self.sensitive = parent.sensitive
 
@@ -26,46 +26,32 @@ class Lego:
         self.nlayers = len(self.sensitive)
         self.nplots  = divideCanvas(self.nlayers, self.canvas)
 
-        # construct a 2D histogram
-        layer   = 1
-        element = self.geometry[self.sensitive[layer]]
-        side    = element['side']
-        ii      = int(float(side) / 10)+1
-        hwid    = ii * 10
-
-        self.nbinx   = 80
-        self.xmin    =-hwid
-        self.xmax    = hwid
-        self.xstep   = (self.xmax-self.xmin)/self.nbinx
-
-        self.nbiny   = 80
-        self.ymin    =-hwid
-        self.ymax    = hwid
-        self.ystep   = (self.ymax-self.ymin)/self.nbiny
-
-        # create a 2D plot for each sensor
-        self.wafer = []
+        # create honeycomb histograms
+        self.hist = []
         for l in xrange(self.nplots):
-            layer = l + 1
-            hname = 'wafer%3.3d' % layer
-            wafer = TH2F(hname, "", 
-                         self.nbinx, 
-                         self.xmin, 
-                         self.xmax, 
-                         self.nbiny, 
-                         self.ymin, 
-                         self.ymax)
+            layer =  l + 1
+            element = self.geometry[self.sensitive[layer]]
+            if not element.has_key('cellsize'):
+                sys.exit('** TBLego - cellsize not found')
+            if not element.has_key('side'):
+                sys.exit('** TBLego - side not founds')
 
-            wafer.GetXaxis().CenterTitle()
-            wafer.GetXaxis().SetTitle("#font[12]{x} axis")
-            wafer.GetXaxis().SetTitleOffset(1.5)
-            wafer.SetNdivisions(505, "X")
+            cellside= element['cellsize']
+            side    = element['side']
+            poly = TH2Poly()
+            poly.SetName('lego %3d' % layer)
+            poly.SetTitle('lego %3d' % layer)
+            poly.GetXaxis().CenterTitle()
+            poly.GetXaxis().SetTitle("#font[12]{x} axis")
+            poly.GetYaxis().CenterTitle()
+            poly.GetYaxis().SetTitle("#font[12]{y} axis")
 
-            wafer.GetYaxis().CenterTitle()
-            wafer.GetYaxis().SetTitle("#font[12]{y} axis")
-            wafer.GetYaxis().SetTitleOffset(1.5)
-            wafer.SetNdivisions(505, "Y")
-            self.wafer.append(wafer)
+            # populate histogram with cells
+            cells = parent.cells[layer]
+            for ii, cell in enumerate(cells):
+                xv, yv = computeBinVertices(cellside, cell)
+                poly.AddBin(len(xv), xv, yv)
+            self.hist.append(poly)
 
     def __del__(self):
         pass
@@ -73,23 +59,16 @@ class Lego:
     def Draw(self, parent):
         if parent.hits == None: return
 
-        gStyle.SetOptStat("")        
-
-        for l in xrange(self.nplots):
+        gStyle.SetOptStat("")
+        for l, h in enumerate(self.hist):
             layer = l + 1
             cells = parent.cells[layer]
-
-            for ii in xrange(cells.size()):
-                cell = cells[ii]
-                if cell.count < parent.ADCmin: continue
-
-                binx = int((cell.x - self.xmin)/self.xstep) + 1
-                biny = int((cell.y - self.ymin)/self.ystep) + 1
-
-                self.wafer[l].SetBinContent(binx, biny, cell.count)
-
+            for ii, cell in enumerate(cells):
+                h.SetBinContent(ii+1, cell.count)
+            h.SetMaximum(parent.maxCount)
             self.canvas.cd(layer)
-            self.wafer[l].Draw("LEGO2Z")
+            h.Draw("legogl")
+            if len(self.hist) > 16: continue
         self.canvas.Update()
 
         if parent.shutterOpen:
