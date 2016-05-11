@@ -33,7 +33,16 @@ def getHits(parent, cellmap, sensitive, keyname="SKIROC2DataFrame"):
         xy = cellmap.uv2xy(u, v)
         x  = xy.first
         y  = xy.second
-        z  = parent.geometry[sensitive[l]]['z']
+        ii =-1
+        if sensitive.has_key(l):
+            ii = sensitive[l]
+            if ii > len(parent.geometry)-1:
+                sys.exit("\n**getHits-number of sensitive layers in geometry\n"\
+                             "   less than number in data!\n")
+        else:
+            sys.exit("\n**getHits-sensitive layer %d not found in geometry" % l)
+
+        z  = parent.geometry[ii]['z']
         adc= digi[0].adcHigh()
         if not hits.has_key(l): hits[l] = []
         hits[l].append((adc, u, v, x, y, z))
