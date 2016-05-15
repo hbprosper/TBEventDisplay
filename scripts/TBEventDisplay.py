@@ -21,8 +21,8 @@ from HGCal.TBStandaloneSimulator.TBGeometryUtil import *
 from string import *
 from ROOT import *
 #------------------------------------------------------------------------------
-WIDTH        = 1000            # Width of GUI in pixels
-HEIGHT       =  800            # Height of GUI in pixels
+WIDTH        = 1200            # Width of GUI in pixels
+HEIGHT       =  900            # Height of GUI in pixels
 VERSION      = \
 """
 TBEventDisplay.py %s
@@ -163,10 +163,10 @@ class TBEventDisplay:
 
         self.Color = root.Color
         self.accumulate = False
-        self.ADCmin     = 1 
-        self.ADCmax     = 3000
         # in accumulate mode update every self.skip events
         self.skip       = 50
+        self.ADCmin     = 300     # minimum number of adc counts
+        self.setMaxAll  = False   # set all histograms to the same maximum
         self.cellmap    = HGCCellMap()
         # histogram cache (one per sensor)
         self.hist       = []
@@ -175,9 +175,6 @@ class TBEventDisplay:
         self.geometry   = geometry['geometry']
         self.sensitive  = geometry['sensitive']
         self.shutterOpen= False
-
-        # graphics style
-        self.setStyle()
 
         # create 2-D histograms for each sensor
         self.initDataCache()
@@ -219,7 +216,6 @@ class TBEventDisplay:
                           ('&Goto',     'gotoEvent'),
                           0,
                           ('Set min[ADC]', 'setADCmin'),
-                          ('Set max[ADC]', 'setADCmax'),
                           ('Set delay',    'setDelay')])
 
         self.menuBar.Add('Help',
@@ -270,6 +266,12 @@ class TBEventDisplay:
                                             hotstring='Accumulate',
                                             method='toggleAccumulate',
                                             text='Accumulate')
+
+        self.setMaxAllButton  = CheckButton(self, self.toolBar,
+                                            hotstring='Set max ALL',
+                                            method='toggleSetMaxAll',
+                                            text='set all histograms '\
+                                                'to the same max value')
   
         self.snapCanvasButton = PictureButton(self, self.toolBar,
                                               picture='Camera.png',
@@ -330,6 +332,9 @@ class TBEventDisplay:
 
         if filename != None: 
             self.__openFile(filename)
+
+        # graphics style
+        self.setStyle()
 
         # To DEBUG a display uncomment next line
         #self.setPage(2)
@@ -471,6 +476,9 @@ class TBEventDisplay:
 
     def toggleAccumulate(self):
         self.accumulate = not self.accumulate
+
+    def toggleSetMaxAll(self):
+        self.setMaxAll = not self.setMaxAll
 
     def usage(self):
         dialog = Dialog(self.root, self.main)
@@ -643,12 +651,13 @@ class TBEventDisplay:
             if y > self.maxCount:
                 self.maxCount = y
 
-        self.maxCount *= 1.1
-        # set all histograms to minimum value
-
+        # set all histograms to min/max values
         for h in self.hist:
             h.SetMinimum(self.ADCmin)
-            #h.SetMaximum(self.maxCount)
+            if self.setMaxAll > 0:
+                h.SetMaximum(self.maxCount)
+            else:
+                h.SetMaximum()
 
     def setADCmin(self):
         from string import atof
@@ -657,13 +666,7 @@ class TBEventDisplay:
                                            '%d' % self.ADCmin))
         self.statusBar.SetText('min[ADC] set to: %d' % self.ADCmin, 1)	
 
-    def setADCmax(self):
-        from string import atof
-        dialog = Dialog(self.root, self.main)
-        self.ADCmax = atof(dialog.GetInput('enter max[ADC] count', 
-                                           '%d' % self.ADCmax))
-        self.statusBar.SetText('max[ADC] set to: %d' % self.ADCmax, 3000)	
-
+ 
     def setDelay(self):
         from string import atof
         dialog = Dialog(self.root, self.main)

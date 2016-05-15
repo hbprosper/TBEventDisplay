@@ -59,7 +59,6 @@ class Lego:
     def Draw(self, parent):
         if parent.hits == None: return
 
-        gStyle.SetOptStat("")
         for l, h in enumerate(self.hist):
             layer = l + 1
             cells = parent.cells[layer]
@@ -68,7 +67,6 @@ class Lego:
             h.SetMaximum(parent.maxCount)
             self.canvas.cd(layer)
             h.Draw("legogl")
-            if len(self.hist) > 16: continue
         self.canvas.Update()
 
         if parent.shutterOpen:

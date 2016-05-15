@@ -91,7 +91,7 @@ class Display3D:
 
         if parent.shutterOpen:
             filename = "display3d%5.5d.cc" % parent.eventNumber
-            self.page.viewer.SaveAs(filename)
+            #self.page.viewer.SaveAs(filename)
 
     def drawGeometry(self, parent):
         for ii in xrange(len(self.geometry)):

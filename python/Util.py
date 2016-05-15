@@ -72,7 +72,6 @@ TRootEmbeddedCanvas* TRootEmbeddedGLCanvas(const char* name,
 {
   gStyle->SetCanvasPreferGL(true);
   TRootEmbeddedCanvas* embedded = new TRootEmbeddedCanvas(name, p, w, h);
-  //gStyle->SetCanvasPreferGL(false);
   return embedded;
 }
 '''
